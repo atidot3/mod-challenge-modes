@@ -541,7 +541,7 @@ public:
         // Send the global Random message to all players
         RandomDeathMessageHCWorld deathMessageGenhc;
         std::string randomWorldDeathMessage = deathMessageGenhc.GetRandomHCWorldDieMessage();	
-        std::string messagehc = "Challenger " + player->GetName()+ " " + randomWorldDeathMessage;
+        std::string messagehc = "Hardcore Challenger " + player->GetName() + " level: " + std::to_string(player->GetLevel()) + " " + randomWorldDeathMessage;
         SendGlobalMessage(messagehc);
 
         // Send Fail to Character to end the one life
@@ -579,7 +579,7 @@ public:
 	    // Send the global Random message to all players
         RandomDeathMessageHCWorld deathMessageGenhc;
         std::string randomWorldDeathMessage = deathMessageGenhc.GetRandomHCWorldDieMessage();	
-		std::string messagehc = "Challenger " + killed->GetName()+ " " + randomWorldDeathMessage;
+		std::string messagehc = "Hardcore Challenger " + killed->GetName() + " level: " + std::to_string(killed->GetLevel()) + " " + randomWorldDeathMessage;
         SendGlobalMessage(messagehc);
 
 		// Send Fail to Character to end the one life
@@ -594,6 +594,12 @@ public:
     void OnLevelChanged(Player* player, uint8 oldlevel) override
     {
         ChallengeMode::OnLevelChanged(player, oldlevel);
+
+        const auto level = player->GetLevel();
+        if (level >= 10 && level <= 80 && level % 10 == 0) {
+            std::string messagehc = "Hardcore Challenger " + player->GetName() + " has reach level: " + std::to_string(player->GetLevel());
+            SendGlobalMessage(messagehc);
+        }
     }
     // Block battleground queue for Hardcore players
     bool CanEnterBattleground(Player* player)
@@ -1325,7 +1331,7 @@ public:
             return;
         }
         player->UpdatePlayerSetting("mod-challenge-modes", HARDCORE_DEAD, 1); // To be safe it's on
-		SendPlayerRaidWarning(player, "Challenger: This Iron Man Character has fallen! Their journey ends, and now they are but a mere ghost of their former self!!");		
+		SendPlayerRaidWarning(player, "IronMan Challenger: This Iron Man Character has fallen! Their journey ends, and now they are but a mere ghost of their former self!!");		
         //player->GetSession()->KickPlayer("The Iron Man Character has perished no resurrection, no second chances!");
     }
 	
@@ -1347,7 +1353,7 @@ public:
         // Send the global Random message to all players
         RandomDeathMessageIronWorld deathMessageGenhc;
         std::string randomWorldDeathMessage = deathMessageGenhc.GetRandomHCIronDieMessage();	
-		std::string messagehc = "Challenger " + player->GetName()+ " " + randomWorldDeathMessage;
+		std::string messagehc = "IronMan Challenger " + player->GetName() + " level: " + std::to_string(player->GetLevel()) + " " + randomWorldDeathMessage;
         SendGlobalMessage(messagehc);
 
 		// Send Fail to Character to end the one life
@@ -1386,7 +1392,7 @@ public:
 	    // Send the global Random message to all players
         RandomDeathMessageHeroPVP deathMessageGenIr;
         std::string randomWorldDeathMessageIr = deathMessageGenIr.GetRandomHeroPVPWorldDieMessage();	
-		std::string messageIr = "Challenger " + killed->GetName()+ " " + randomWorldDeathMessageIr;
+		std::string messageIr = "IronMan Challenger " + killed->GetName()+ " level: " + std::to_string(killed->GetLevel()) + " " + randomWorldDeathMessageIr;
         SendGlobalMessage(messageIr);
 
 		// Send Fail to Character to end the one life
@@ -1406,6 +1412,12 @@ public:
         }
         player->SetFreeTalentPoints(0); // Remove all talent points
         ChallengeMode::OnLevelChanged(player, oldlevel);
+
+        const auto level = player->GetLevel();
+        if (level >= 10 && level <= 80 && level % 10 == 0) {
+            std::string messagehc = "IronMan Challenger " + player->GetName() + " has reach level: " + std::to_string(player->GetLevel());
+            SendGlobalMessage(messagehc);
+        }
     }
 
     void OnTalentsReset(Player* player, bool /*noCost*/) override
@@ -1504,7 +1516,7 @@ public:
             // We check player then trap player in IceBlock and send warning or you can use the kick part if want
             // this is a work around for now code won't detect on use of potions, elixirs, and flasks fully
             player->CastStop();
-            SendPlayerRaidWarning(player, "Challenger: You cannot use potions, elixirs, or flasks in Iron Man.");
+            SendPlayerRaidWarning(player, "IronMan Challenger: You cannot use potions, elixirs, or flasks in Iron Man.");
             player->RemoveAllAuras(); // Remove the buff if any
             player->AddAura(15007, player); // Resurrection Sickness as punishment
             player->CastSpell(player, 65918, true);  // For now we knockdown player for 10sec
@@ -1532,7 +1544,7 @@ public:
                         // We check player then trap player in IceBlock and send warning or you can use the kick part if want
                         // this is a work around for now code won't detect on use of potions, elixirs, and flasks fully
                         player->CastStop();
-                        SendPlayerRaidWarning(player, "Challenger: You cannot use food that provides buffs in Iron Man.");
+                        SendPlayerRaidWarning(player, "IronMan Challenger: You cannot use food that provides buffs in Iron Man.");
                         player->RemoveAllAuras(); // Remove the buff if any
                         player->AddAura(15007, player); // Resurrection Sickness as punishment
                         player->CastSpell(player, 65918, true);  // For now we knockdown player for 10sec
@@ -1686,8 +1698,8 @@ public:
                             sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player) ||
                             (player->getClass() != CLASS_DEATH_KNIGHT && (CheckItemsInBags(player) || HasEquippedItemWithEnchantment(player)));
 
-        // If a challenge is active, do nothing
-        if (challengeActive)
+        // If a challenge is active or player is too high level, do nothing
+        if (challengeActive || player->GetLevel() > 5)
         {
             return true;
         }

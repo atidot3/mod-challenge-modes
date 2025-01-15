@@ -471,9 +471,7 @@ public:
     void OnLogin(Player* player) override
     {
         // Reworked login checks
-        bool hardcoreEnabled = sChallengeModes->challengeEnabledForPlayer(SETTING_HARDCORE, player);
-
-        if (hardcoreEnabled)
+        if (sChallengeModes->challengeEnabledForPlayer(SETTING_HARDCORE, player))
         {
             // Check if the player is dead
             if (player->GetPlayerSetting("mod-challenge-modes", HARDCORE_DEAD).value == 1)
@@ -487,18 +485,17 @@ public:
                 SendPlayerRaidWarning(player, "Challenger: Hardcore Challenge is Active on this Character!");
             }
         }
-        
-            if (!sChallengeModes->challengeEnabledForPlayer(SETTING_HARDCORE, player))
-            {
-                return;
-            }
+
+        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_HARDCORE, player))
+        {
+            return;
+        }
         // If Hardcore is enabled and player dead check only trigger if bugs out above
         if (player->GetPlayerSetting("mod-challenge-modes", HARDCORE_DEAD).value == 1)	
         {
             SendPlayerRaidWarning(player, "Challenger: This Hardcore Character has perished, no resurrection, no second chances!");
             //add kick here if needed
         }
-
     }
 
     //DEATHS
@@ -559,25 +556,25 @@ public:
             return;
         }	
 	
-    // Check if the killer is self-inflicted kill (Picks up Non PVP Events a workaround)
-    if (killer == killed)
-    {
-        // Calling Random Deaths Chatter Script
-        RandomDeathMessageSelf deathMessageGen;
-        std::string randomDeathMessage = deathMessageGen.GetRandomSelfDieMessage();
-		
-        // Send the random message to the player   
-		SendPlayerRaidWarning(killed, randomDeathMessage);		
-    }
-    else
-    {
-        // Calling Random Deaths Chatter Script
-        RandomDeathMessagePVP deathMessageGen;
-        std::string randomDeathMessage = deathMessageGen.GetRandomPVPMessage();
-		
-        // Send the random message to the player   
-		SendPlayerRaidWarning(killed, randomDeathMessage);		
-    }
+        // Check if the killer is self-inflicted kill (Picks up Non PVP Events a workaround)
+        if (killer == killed)
+        {
+            // Calling Random Deaths Chatter Script
+            RandomDeathMessageSelf deathMessageGen;
+            std::string randomDeathMessage = deathMessageGen.GetRandomSelfDieMessage();
+            
+            // Send the random message to the player   
+            SendPlayerRaidWarning(killed, randomDeathMessage);		
+        }
+        else
+        {
+            // Calling Random Deaths Chatter Script
+            RandomDeathMessagePVP deathMessageGen;
+            std::string randomDeathMessage = deathMessageGen.GetRandomPVPMessage();
+            
+            // Send the random message to the player   
+            SendPlayerRaidWarning(killed, randomDeathMessage);		
+        }
 	
 	    // Send the global Random message to all players
         RandomDeathMessageHCWorld deathMessageGenhc;
@@ -1532,13 +1529,13 @@ public:
                         spellInfo->Effects[i].ApplyAuraName == SPELL_AURA_MOD_HEALING ||
                         spellInfo->Effects[i].ApplyAuraName == SPELL_AURA_MOD_STAT)
                     {
-                    // We check player then trap player in IceBlock and send warning or you can use the kick part if want
-                    // this is a work around for now code won't detect on use of potions, elixirs, and flasks fully
-                    player->CastStop();
-                    SendPlayerRaidWarning(player, "Challenger: You cannot use food that provides buffs in Iron Man.");
-                    player->RemoveAllAuras(); // Remove the buff if any
-                    player->AddAura(15007, player); // Resurrection Sickness as punishment
-                    player->CastSpell(player, 65918, true);  // For now we knockdown player for 10sec
+                        // We check player then trap player in IceBlock and send warning or you can use the kick part if want
+                        // this is a work around for now code won't detect on use of potions, elixirs, and flasks fully
+                        player->CastStop();
+                        SendPlayerRaidWarning(player, "Challenger: You cannot use food that provides buffs in Iron Man.");
+                        player->RemoveAllAuras(); // Remove the buff if any
+                        player->AddAura(15007, player); // Resurrection Sickness as punishment
+                        player->CastSpell(player, 65918, true);  // For now we knockdown player for 10sec
                     
                         //player->GetSession()->KickPlayer("You cannot use food that provides buffs in Iron Man"); // Or just kick
                         return false;
@@ -1740,8 +1737,7 @@ public:
         std::string randomWorldShrineMessage = StartMessageChal.RandomShrineMessageWorldStart();	
 		std::string messageShrineStart = "Challenger " + player->GetName()+ " " + randomWorldShrineMessage;
         SendGlobalMessage(messageShrineStart);
-
-	
+        player->PlayDirectSound(7234);
         CloseGossipMenuFor(player);
         return true;
     }

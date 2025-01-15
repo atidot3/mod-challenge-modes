@@ -288,7 +288,7 @@ private:
 
     static void LoadConfig()
     {
-        sChallengeModes->itemQualityLevelMaxQuality = static_cast<ItemQualityType>(sConfigMgr->GetOption<uint32>("ItemQualityLevel.MaxQuality", ITEM_QUALITY_COMMON));
+        sChallengeModes->itemQualityLevelMaxQuality = static_cast<ItemQualities>(sConfigMgr->GetOption<uint32>("ItemQualityLevel.MaxQuality", ItemQualities::ITEM_QUALITY_POOR));
         sChallengeModes->modifyXP = sConfigMgr->GetOption<bool>("ChallengeModes.ModifyXP", true);
         sChallengeModes->challengesEnabled = sConfigMgr->GetOption<bool>("ChallengeModes.Enable", false);
         if (sChallengeModes->enabled())
@@ -355,13 +355,12 @@ public:
             : PlayerScript(scriptName), settingName(settingName)
     { }
     
-    virtual const char* GetChallengeName() const = 0;
-
     void OnLogin(Player* player) override
     {
         if (sChallengeModes->challengeEnabledForPlayer(settingName, player))
         {
-            ChatHandler(player->GetSession()).PSendSysMessage("You have the %s challenge mode enabled.", this->GetChallengeName());
+            
+            ChatHandler(player->GetSession()).PSendSysMessage("You have the %s challenge mode enabled.", settingName);
         }
     }
 
@@ -397,7 +396,7 @@ public:
             CharTitlesEntry const* titleInfo = sCharTitlesStore.LookupEntry(titleRewardMap->at(level));
             if (!titleInfo)
             {
-                LOG_ERROR("mod-challenge-modes", "Invalid title ID {}!", titleRewardMap->at(level));
+                //LOG_ERROR("mod-challenge-modes", "Invalid title ID {}!", titleRewardMap->at(level));
                 return;
             }
             ChatHandler handler(player->GetSession());
@@ -479,7 +478,7 @@ public:
     {
         if (sChallengeModes->challengeEnabledForPlayer(SETTING_HARDCORE, player))
         {
-            ChatHandler(player->GetSession()).PSendSysMessage("You have the %s challenge mode enabled.", GetChallengeName());
+            ChatHandler(player->GetSession()).PSendSysMessage("You have the HARDCORE challenge mode enabled.");
 
             if (sChallengeModes->challengeEnabledForPlayer(HARDCORE_DEAD, player))
             {
@@ -626,7 +625,7 @@ public:
         {
             return true;
         }
-        return pItem->GetTemplate()->Quality <= ITEM_QUALITY_NORMAL;
+        return pItem->GetTemplate()->Quality <= sChallengeModes->itemQualityLevelMaxQuality;
     }
 
     void OnGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
@@ -748,7 +747,7 @@ public:
         {
             return true;
         }
-        return pItem->GetTemplate()->Quality <= ITEM_QUALITY_NORMAL;
+        return pItem->GetTemplate()->Quality <= sChallengeModes->itemQualityLevelMaxQuality;
     }
 
     bool CanApplyEnchantment(Player* player, Item* /*item*/, EnchantmentSlot /*slot*/, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override

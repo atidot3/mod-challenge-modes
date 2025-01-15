@@ -3,11 +3,39 @@
  */
 
 #include "ChallengeModes.h"
+#include "Tokenize.h"
+#include "Player.h"
+#include "SpellMgr.h"
 
 ChallengeModes* ChallengeModes::instance()
 {
     static ChallengeModes instance;
     return &instance;
+}
+
+std::string ChallengeModes::GetChallengeNameFromEnum(const uint8& value)
+{
+    switch (value)
+    {
+        case SETTING_HARDCORE:
+            return "Hardcore";
+        case SETTING_SEMI_HARDCORE:
+            return "Semi-Hardcore";
+        case SETTING_SELF_CRAFTED:
+            return "Self-Crafted";
+        case SETTING_ITEM_QUALITY_LEVEL:
+            return "Low Quality Items";
+        case SETTING_SLOW_XP_GAIN:
+            return "Slow XP";
+        case SETTING_VERY_SLOW_XP_GAIN:
+            return "Very Slow XP";
+        case SETTING_QUEST_XP_ONLY:
+            return "Quest XP Only";
+        case SETTING_IRON_MAN:
+            return "Iron Man";
+    }
+
+    return "ERROR";
 }
 
 bool ChallengeModes::challengeEnabledForPlayer(ChallengeModeSettings setting, Player* player) const
@@ -260,6 +288,8 @@ private:
 
     static void LoadConfig()
     {
+        sChallengeModes->itemQualityLevelMaxQuality = static_cast<ItemQualityType>(sConfigMgr->GetOption<uint32>("ItemQualityLevel.MaxQuality", ITEM_QUALITY_COMMON));
+        sChallengeModes->modifyXP = sConfigMgr->GetOption<bool>("ChallengeModes.ModifyXP", true);
         sChallengeModes->challengesEnabled = sConfigMgr->GetOption<bool>("ChallengeModes.Enable", false);
         if (sChallengeModes->enabled())
         {
@@ -324,79 +354,117 @@ public:
                            ChallengeModeSettings settingName)
             : PlayerScript(scriptName), settingName(settingName)
     { }
+    
+    virtual const char* GetChallengeName() const = 0;
+
+    void OnLogin(Player* player) override
+    {
+        if (sChallengeModes->challengeEnabledForPlayer(settingName, player))
+        {
+            ChatHandler(player->GetSession()).PSendSysMessage("You have the %s challenge mode enabled.", this->GetChallengeName());
+        }
+    }
 
     static bool mapContainsKey(const std::unordered_map<uint8, uint32>* mapToCheck, uint8 key)
     {
         return (mapToCheck->find(key) != mapToCheck->end());
     }
 
-    void OnGiveXP(Player* player, uint32& amount, Unit* /*victim*/, uint8 /*xpSource*/) override
+    void ChallengeMode::OnGiveXP(Player* player, uint32& amount, Unit* /*victim*/, uint8 /*xpSource*/) override
     {
-        if (!sChallengeModes->challengeEnabledForPlayer(settingName, player))
+        if (!sChallengeModes->challengeEnabledForPlayer(settingName, player) || !sChallengeModes->modifyXP)
         {
             return;
         }
         amount *= sChallengeModes->getXpBonusForChallenge(settingName);
     }
 
-void OnLevelChanged(Player* player, uint8 /*oldlevel*/) override
-{
-    if (!sChallengeModes->challengeEnabledForPlayer(settingName, player))
+    void OnLevelChanged(Player* player, uint8 /*oldlevel*/) override
     {
-        return;
-    }
-
-    const std::unordered_map<uint8, uint32>* titleRewardMap = sChallengeModes->getTitleMapForChallenge(settingName);
-    const std::unordered_map<uint8, uint32>* talentRewardMap = sChallengeModes->getTalentMapForChallenge(settingName);
-    const std::unordered_map<uint8, uint32>* itemRewardMap = sChallengeModes->getItemMapForChallenge(settingName);
-    const std::unordered_map<uint8, uint32>* achievementRewardMap = sChallengeModes->getAchievementMapForChallenge(settingName);
-    uint8 level = player->GetLevel();
-
-    if (mapContainsKey(titleRewardMap, level))
-    {
-        CharTitlesEntry const* titleInfo = sCharTitlesStore.LookupEntry(titleRewardMap->at(level));
-        if (!titleInfo)
+        if (!sChallengeModes->challengeEnabledForPlayer(settingName, player))
         {
-            LOG_ERROR("mod-challenge-modes", "Invalid title ID {}!", titleRewardMap->at(level));
-            return;
-        }
-        ChatHandler handler(player->GetSession());
-        std::string tNameLink = handler.GetNameLink(player);
-        std::string titleNameStr = Acore::StringFormat(player->getGender() == GENDER_MALE ? titleInfo->nameMale[handler.GetSessionDbcLocale()] : titleInfo->nameFemale[handler.GetSessionDbcLocale()], player->GetName());
-        player->SetTitle(titleInfo);
-    }
-
-    if (mapContainsKey(talentRewardMap, level))
-    {
-        player->RewardExtraBonusTalentPoints(talentRewardMap->at(level));
-    }
-
-    if (mapContainsKey(achievementRewardMap, level))
-    {
-        AchievementEntry const* achievementInfo = sAchievementStore.LookupEntry(achievementRewardMap->at(level));
-        if (!achievementInfo)
-        {
-            LOG_ERROR("mod-challenge-modes", "Invalid Achievement ID {}!", achievementRewardMap->at(level));
             return;
         }
 
-        ChatHandler handler(player->GetSession());
-        std::string tNameLink = handler.GetNameLink(player);
-        player->CompletedAchievement(achievementInfo);
-    }
+        const std::unordered_map<uint8, uint32>* titleRewardMap = sChallengeModes->getTitleMapForChallenge(settingName);
+        const std::unordered_map<uint8, uint32>* talentRewardMap = sChallengeModes->getTalentMapForChallenge(settingName);
+        const std::unordered_map<uint8, uint32>* itemRewardMap = sChallengeModes->getItemMapForChallenge(settingName);
+        const std::unordered_map<uint8, uint32>* achievementRewardMap = sChallengeModes->getAchievementMapForChallenge(settingName);
+        uint8 level = player->GetLevel();
 
-    if (mapContainsKey(itemRewardMap, level))
-    {
-        uint32 itemEntry = itemRewardMap->at(level);
-        uint32 itemAmount = sChallengeModes->getItemRewardAmount(settingName); // Fetch item amount from config
-        player->SendItemRetrievalMail({ { itemEntry, itemAmount } });
-    }
+        if (mapContainsKey(titleRewardMap, level))
+        {
+            CharTitlesEntry const* titleInfo = sCharTitlesStore.LookupEntry(titleRewardMap->at(level));
+            if (!titleInfo)
+            {
+                LOG_ERROR("mod-challenge-modes", "Invalid title ID {}!", titleRewardMap->at(level));
+                return;
+            }
+            ChatHandler handler(player->GetSession());
+            std::string tNameLink = handler.GetNameLink(player);
+            std::string titleNameStr = Acore::StringFormat(player->getGender() == GENDER_MALE ? titleInfo->nameMale[handler.GetSessionDbcLocale()] : titleInfo->nameFemale[handler.GetSessionDbcLocale()], player->GetName());
+            player->SetTitle(titleInfo);
+        }
+        if (mapContainsKey(talentRewardMap, level))
+        {
+            player->RewardExtraBonusTalentPoints(talentRewardMap->at(level));
+        }
+        if (mapContainsKey(itemRewardMap, level))
+        {
+            // Mail item to player
+            uint32 itemEntry = itemRewardMap->at(level);
+            player->SendItemRetrievalMail({ { itemEntry, 1 } });
+        }
+        if (sChallengeModes->getDisableLevel(settingName) && sChallengeModes->getDisableLevel(settingName) <= level)
+        {
+            player->UpdatePlayerSetting("mod-challenge-modes", settingName, 0);
+        }
 
-    if (sChallengeModes->getDisableLevel(settingName) && sChallengeModes->getDisableLevel(settingName) <= level)
-    {
-        player->UpdatePlayerSetting("mod-challenge-modes", settingName, 0);
+        if (mapContainsKey(titleRewardMap, level))
+        {
+            CharTitlesEntry const* titleInfo = sCharTitlesStore.LookupEntry(titleRewardMap->at(level));
+            if (!titleInfo)
+            {
+                LOG_ERROR("mod-challenge-modes", "Invalid title ID {}!", titleRewardMap->at(level));
+                return;
+            }
+            ChatHandler handler(player->GetSession());
+            std::string tNameLink = handler.GetNameLink(player);
+            std::string titleNameStr = Acore::StringFormat(player->getGender() == GENDER_MALE ? titleInfo->nameMale[handler.GetSessionDbcLocale()] : titleInfo->nameFemale[handler.GetSessionDbcLocale()], player->GetName());
+            player->SetTitle(titleInfo);
+        }
+
+        if (mapContainsKey(talentRewardMap, level))
+        {
+            player->RewardExtraBonusTalentPoints(talentRewardMap->at(level));
+        }
+
+        if (mapContainsKey(achievementRewardMap, level))
+        {
+            AchievementEntry const* achievementInfo = sAchievementStore.LookupEntry(achievementRewardMap->at(level));
+            if (!achievementInfo)
+            {
+                LOG_ERROR("mod-challenge-modes", "Invalid Achievement ID {}!", achievementRewardMap->at(level));
+                return;
+            }
+
+            ChatHandler handler(player->GetSession());
+            std::string tNameLink = handler.GetNameLink(player);
+            player->CompletedAchievement(achievementInfo);
+        }
+
+        if (mapContainsKey(itemRewardMap, level))
+        {
+            uint32 itemEntry = itemRewardMap->at(level);
+            uint32 itemAmount = sChallengeModes->getItemRewardAmount(settingName); // Fetch item amount from config
+            player->SendItemRetrievalMail({ { itemEntry, itemAmount } });
+        }
+
+        if (sChallengeModes->getDisableLevel(settingName) && sChallengeModes->getDisableLevel(settingName) <= level)
+        {
+            player->UpdatePlayerSetting("mod-challenge-modes", settingName, 0);
+        }
     }
-}
 
 private:
     ChallengeModeSettings settingName;
@@ -409,12 +477,17 @@ public:
 
     void OnLogin(Player* player) override
     {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_HARDCORE, player) || !sChallengeModes->challengeEnabledForPlayer(HARDCORE_DEAD, player))
+        if (sChallengeModes->challengeEnabledForPlayer(SETTING_HARDCORE, player))
         {
-            return;
+            ChatHandler(player->GetSession()).PSendSysMessage("You have the %s challenge mode enabled.", GetChallengeName());
+
+            if (sChallengeModes->challengeEnabledForPlayer(HARDCORE_DEAD, player))
+            {
+                player->KillPlayer();
+                player->GetSession()->KickPlayer("Your hardcore character has died!");
+                return;
+            }
         }
-        player->KillPlayer();
-        player->GetSession()->KickPlayer("Hardcore character died");
     }
 
     void OnPlayerReleasedGhost(Player* player) override
@@ -515,6 +588,15 @@ public:
         {
             return true;
         }
+
+        // Allow fishing poles to be equipped since you cannot craft them.
+        if (!pItem->GetTemplate()->HasSignature() &&
+            pItem->GetTemplate()->Class == ITEM_CLASS_WEAPON &&
+            pItem->GetTemplate()->SubClass == ITEM_SUBCLASS_WEAPON_FISHING_POLE)
+        {
+            return true;
+        }
+
         if (!pItem->GetTemplate()->HasSignature())
         {
             return false;
@@ -845,6 +927,37 @@ public:
     }
 };
 
+class ChallengeMiscPlayerScripts : public PlayerScript
+{
+public:
+    ChallengeMiscPlayerScripts() : PlayerScript("ChallengeMiscPlayerScripts") { }
+    void OnLogin(Player* player) override
+    {
+        if (!player)
+        {
+            return;
+        }
+        std::stringstream ss;
+        ss << "Challenge Modes Enabled: ";
+        uint8 enabledCount = 0;
+        for (uint8 i = 0; i < SETTING_MODE_MAX; ++i)
+        {
+            auto setting = player->GetPlayerSetting("mod-challenge-modes", i);
+            if (setting.value == 1)
+            {
+                ss << sChallengeModes->GetChallengeNameFromEnum(i);
+                ss << ", ";
+                enabledCount++;
+            }
+        }
+        if (enabledCount == 0)
+        {
+            return;
+        }
+        ChatHandler(player->GetSession()).SendSysMessage(ss.str());
+    }
+};
+
 // Add all scripts in one
 void AddSC_mod_challenge_modes()
 {
@@ -858,4 +971,5 @@ void AddSC_mod_challenge_modes()
     new ChallengeMode_VerySlowXpGain();
     new ChallengeMode_QuestXpOnly();
     new ChallengeMode_IronMan();
+    new ChallengeMiscPlayerScripts();
 }

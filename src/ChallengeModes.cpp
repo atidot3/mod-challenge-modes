@@ -379,6 +379,7 @@ public:
         if (sChallengeModes->challengeEnabledForPlayer(settingName, player))
         {
             ChatHandler(player->GetSession()).PSendSysMessage("You have the %s challenge mode enabled.", settingName);
+            player->PlayDirectSound(7234);
         }
     }
 
@@ -456,6 +457,17 @@ public:
         {
             player->UpdatePlayerSetting("mod-challenge-modes", settingName, 0);
             StopChallengeForPlayer(player); // Just incase above fails
+            
+            std::string messagehc = "Challenger " + player->GetName() + " has reach level: " + std::to_string(player->GetLevel()) + " and have completed the challenge !";
+            SendGlobalMessage(messagehc);
+        }
+        else
+        {
+            const auto level = player->GetLevel();
+            if (level >= 10 && level <= 80 && level % 10 == 0) {
+                std::string messagehc = "Challenger " + player->GetName() + " has reach level: " + std::to_string(player->GetLevel());
+                SendGlobalMessage(messagehc);
+            }
         }
     }
 
@@ -594,12 +606,6 @@ public:
     void OnLevelChanged(Player* player, uint8 oldlevel) override
     {
         ChallengeMode::OnLevelChanged(player, oldlevel);
-
-        const auto level = player->GetLevel();
-        if (level >= 10 && level <= 80 && level % 10 == 0) {
-            std::string messagehc = "Hardcore Challenger " + player->GetName() + " has reach level: " + std::to_string(player->GetLevel());
-            SendGlobalMessage(messagehc);
-        }
     }
     // Block battleground queue for Hardcore players
     bool CanEnterBattleground(Player* player)
@@ -1412,12 +1418,6 @@ public:
         }
         player->SetFreeTalentPoints(0); // Remove all talent points
         ChallengeMode::OnLevelChanged(player, oldlevel);
-
-        const auto level = player->GetLevel();
-        if (level >= 10 && level <= 80 && level % 10 == 0) {
-            std::string messagehc = "IronMan Challenger " + player->GetName() + " has reach level: " + std::to_string(player->GetLevel());
-            SendGlobalMessage(messagehc);
-        }
     }
 
     void OnTalentsReset(Player* player, bool /*noCost*/) override
@@ -1699,7 +1699,7 @@ public:
                             (player->getClass() != CLASS_DEATH_KNIGHT && (CheckItemsInBags(player) || HasEquippedItemWithEnchantment(player)));
 
         // If a challenge is active or player is too high level, do nothing
-        if (challengeActive || player->GetLevel() > 5)
+        if (challengeActive || player->GetLevel() > 1)
         {
             return true;
         }
